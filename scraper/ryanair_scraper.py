@@ -1,48 +1,44 @@
-import asyncio, os, csv, pandas as pd
-from datetime import datetime
+# scraper/ryanair_scraper.py
+import asyncio
 from playwright.async_api import async_playwright
+import pandas as pd
+from datetime import datetime
 
-ORIGIN = "Vilnius"    # iš miesto (textbox pavadinime)
-DEST   = "Athens"     # į miestą
-DEP_DATE  = "2025-08-24"
-RET_DATE  = "2025-08-28"
+ORIGIN = "Vilnius"
+DESTINATION = "Athens"
+DEPART_DATE = "2025-08-24"
 CSV_PATH = "data/flights.csv"
 
 async def fetch_price():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page(locale="en-GB")
+        page = await browser.new_page()
         await page.goto("https://www.ryanair.com/gb/en")
-        # įvedam miestus
+
         await page.fill("input[placeholder='From']", ORIGIN)
         await page.keyboard.press("Enter")
-        await page.fill("input[placeholder='To']", DEST)
+        await page.fill("input[placeholder='To']", DESTINATION)
         await page.keyboard.press("Enter")
-        # Datos
+
         await page.click("input[placeholder='Depart']")
-        await page.fill("input[placeholder='Depart']", DEP_DATE)
-        await page.fill("input[placeholder='Return']", RET_DATE)
-        # Paieška
-        await page.click("button:has-text('Search')")
-        await page.wait_for_selector(".fare-card__fare-price", timeout=15000)
-        price_text = await page.inner_text(".fare-card__fare-price")
+        await page.wait_for_timeout(1000)
+        await page.click(f"[data-id='{DEPART_DATE}']")
+
+        await page.click("button[data-ref='flight-search-widget__cta']")
+        await page.wait_for_timeout(8000)
+
+        price_elem = await page.query_selector("span.price__value")
+        price = await price_elem.inner_text() if price_elem else "N/A"
+
         await browser.close()
-        return float(price_text.replace("€", "").strip())
 
-def append_csv(price):
-    os.makedirs("data", exist_ok=True)
-    file_exists = os.path.isfile(CSV_PATH)
-    with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(
-                ["date_checked", "origin", "destination", "depart", "return", "price_eur"]
-            )
-        writer.writerow(
-            [datetime.utcnow().strftime("%Y-%m-%d"), ORIGIN, DEST, DEP_DATE, RET_DATE, price]
-        )
+        return {
+            "date_checked": datetime.now().strftime("%Y-%m-%d"),
+            "from": ORIGIN,
+            "to": DESTINATION,
+            "travel_date": DEPART_DATE,
+            "price": price
+        }
 
-if __name__ == "__main__":
-    price_val = asyncio.run(fetch_price())
-    append_csv(price_val)
-    print(f"Saved price €{price_val}")
+def save_to_csv(data):
+    t
