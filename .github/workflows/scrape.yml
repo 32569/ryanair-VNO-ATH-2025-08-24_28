@@ -2,30 +2,27 @@ name: Daily Ryanair Scraper
 
 on:
   schedule:
-    - cron: "0 7 * * *"       # kasdien 07:00 UTC
-  workflow_dispatch:
-
-permissions:
-  contents: write              # leidžia push’ą
+    - cron: '0 7 * * *'  # kasdien 07:00 UTC
+  workflow_dispatch:     # leidžia paleisti rankiniu būdu
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install Python & deps
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Install requirements
-        run: pip install -r requirements.txt
-
-      - name: Install Playwright browsers
-        run: python -m playwright install --with-deps chromium
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas playwright
+          playwright install chromium
 
       - name: Run scraper
         run: python scraper/ryanair_scraper.py
@@ -33,14 +30,16 @@ jobs:
       - name: Commit CSV
         run: |
           git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
+          git config --global user.email "github-actions@github.com"
           git add data/flights.csv
-          git commit -m "Daily Ryanair price update" || echo "no changes"
+          git commit -m "Daily flight data update" || echo "No changes"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload debug screenshot (optional)
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: flights_csv
-          path: data/flights.csv
+          name: screenshot
+          path: screenshot.png
+          if-no-files-found: ignore
