@@ -1,12 +1,10 @@
-# scraper/ryanair_scraper.py
 import asyncio
-from playwright.async_api import async_playwright
-import pandas as pd
 from datetime import datetime
+from playwright.async_api import async_playwright
+import csv
+import os
 
-ORIGIN = "Vilnius"
-DESTINATION = "Athens"
-DEPART_DATE = "2025-08-24"
+ROUTE = {"from": "Vilnius", "to": "Athens", "date": "2025-08-24"}
 CSV_PATH = "data/flights.csv"
 
 async def fetch_price():
@@ -14,31 +12,27 @@ async def fetch_price():
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         await page.goto("https://www.ryanair.com/gb/en")
-
-        await page.fill("input[placeholder='From']", ORIGIN)
-        await page.keyboard.press("Enter")
-        await page.fill("input[placeholder='To']", DESTINATION)
+        await page.locator('input[placeholder="From"]').fill(ROUTE["from"])
+        await page.locator('input[placeholder="To"]').fill(ROUTE["to"])
         await page.keyboard.press("Enter")
 
-        await page.click("input[placeholder='Depart']")
-        await page.wait_for_timeout(1000)
-        await page.click(f"[data-id='{DEPART_DATE}']")
+        await page.locator('input[placeholder*="Depart"]').click()
+        await page.locator(f'[data-id="{ROUTE["date"]}"]').click()
+        await page.wait_for_timeout(4000)
 
-        await page.click("button[data-ref='flight-search-widget__cta']")
-        await page.wait_for_timeout(8000)
-
-        price_elem = await page.query_selector("span.price__value")
-        price = await price_elem.inner_text() if price_elem else "N/A"
+        price_elem = await page.locator(".flight-header__min-price").first.text_content()
+        price = price_elem.strip().replace("€", "").replace(",", ".")
 
         await browser.close()
 
-        return {
-            "date_checked": datetime.now().strftime("%Y-%m-%d"),
-            "from": ORIGIN,
-            "to": DESTINATION,
-            "travel_date": DEPART_DATE,
-            "price": price
-        }
+        today = datetime.today().strftime("%Y-%m-%d")
+        os.makedirs("data", exist_ok=True)
+        file_exists = os.path.isfile(CSV_PATH)
 
-def save_to_csv(data):
-    t
+        with open(CSV_PATH, "a", newline="") as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(["date_checked", "flight_date", "from", "to", "price"])
+            writer.writerow([today, ROUTE["date"], ROUTE["from"], ROUTE["to"], price])
+
+asyncio.run(fetch_price())
