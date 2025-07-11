@@ -11,17 +11,32 @@ async def fetch_price():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
+
+        print("🔗 Opening Ryanair...")
         await page.goto("https://www.ryanair.com/gb/en")
-        await page.locator('input[placeholder="From"]').fill(ROUTE["from"])
-        await page.locator('input[placeholder="To"]').fill(ROUTE["to"])
+
+        # ❗ Wait until the input fields appear
+        await page.wait_for_selector('input[placeholder="From"]', timeout=15000)
+        await page.fill('input[placeholder="From"]', ROUTE["from"])
         await page.keyboard.press("Enter")
+        await page.wait_for_timeout(1000)  # small wait
 
-        await page.locator('input[placeholder*="Depart"]').click()
-        await page.locator(f'[data-id="{ROUTE["date"]}"]').click()
-        await page.wait_for_timeout(4000)
+        await page.fill('input[placeholder="To"]', ROUTE["to"])
+        await page.keyboard.press("Enter")
+        await page.wait_for_timeout(1000)
 
-        price_elem = await page.locator(".flight-header__min-price").first.text_content()
-        price = price_elem.strip().replace("€", "").replace(",", ".")
+        # Click date input and select date
+        await page.click('input[placeholder*="Depart"]')
+        await page.wait_for_timeout(1000)
+        await page.click(f'[data-id="{ROUTE["date"]}"]')
+        await page.wait_for_timeout(4000)  # wait for price to load
+
+        # Extract price
+        try:
+            price_elem = await page.locator(".flight-header__min-price").first.text_content()
+            price = price_elem.strip().replace("€", "").replace(",", ".")
+        except:
+            price = "Not found"
 
         await browser.close()
 
